@@ -3,6 +3,8 @@
 namespace Tweakers\ConstraintBundle\Form\Constraint;
 
 use Symfony\Component\Validator\ConstraintValidator;
+use Symfony\Component\Validator\ConstraintValidatorInterface;
+use Symfony\Component\Validator\ConstraintValidatorFactoryInterface;
 use Symfony\Component\Validator\ConstraintValidatorFactory;
 use Symfony\Component\Validator\Constraint;
 
@@ -27,54 +29,52 @@ class IfConstraintValidator extends ConstraintValidator
 
 		$validatorFactory = new ConstraintValidatorFactory();
 
-		$ifOutcome = true;
-		foreach($if as $condition)
+		$ifOutcome = $this->runValidators($validatorFactory, $if, $value);
+
+		if ($ifOutcome['outcome'] === true)
 		{
-			$validator = $validatorFactory->getInstance($condition);
-			$validator->initialize($this->context);
-
-			if (!$validator->isValid($value, $condition))
-				$ifOutcome = false;
-		}
-
-		if ($ifOutcome)
-		{
-			$thenOutcome = true;
-			foreach($then as $condition)
-			{
-				$validator = $validatorFactory->getInstance($condition);
-				$validator->initialize($this->context);
-
-				if (!$validator->isValid($value, $condition))
-				{
-					$this->setMessage($validator->getMessageTemplate(), $validator->getMessageParameters());
-					$thenOutcome = false;
-				}
-			}
-
-			return $thenOutcome;
+			$outcome = $this->runValidators($validatorFactory, $then, $value);
+			if ($outcome['messageTemplate'] && $outcome['messageParameters'])
+				$this->setMessage($outcome['messageTemplate'], $outcome['messageParameters']);
+			return $outcome['outcome'];
 		}
 		else
 		{
 			if ($else)
 			{
-				$elseOutcome = true;
-				foreach($else as $condition)
-				{
-					$validator = $validatorFactory->getInstance($condition);
-					$validator->initialize($this->context);
-
-					if (!$validator->isValid($value, $condition))
-					{
-						$this->setMessage($validator->getMessageTemplate(), $validator->getMessageParameters());
-						$elseOutcome = false;
-					}
-				}
-
-				return $elseOutcome;
+				$outcome = $this->runValidators($validatorFactory, $else, $value);
+				if ($outcome['messageTemplate'] && $outcome['messageParameters'])
+					$this->setMessage($outcome['messageTemplate'], $outcome['messageParameters']);
+				return $outcome['outcome'];
 			}
 		}
 
 		return true;
+	}
+
+	protected function runValidators(ConstraintValidatorFactoryInterface $validatorFactory, $validators, $value)
+	{
+		$outcome = true;
+		$messageTemplate = null;
+		$messageParameters = null;
+
+		foreach($validators as $condition)
+		{
+			$validator = $validatorFactory->getInstance($condition);
+			$validator->initialize($this->context);
+
+			if (!$validator->isValid($value, $condition))
+			{
+				$messageTemplate = $validator->getMessageTemplate();
+				$messageParameters = $validator->getMessageParameters();
+				$outcome = false;
+			}
+		}
+
+		return array(
+			'outcome'			=> $outcome,
+			'messageTemplate'	=> $messageTemplate,
+			'messageParameters'	=> $messageParameters
+		);
 	}
 }

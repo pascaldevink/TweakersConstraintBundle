@@ -25,6 +25,13 @@ class OtherConstraintValidator extends ConstraintValidator
 		$otherConstraint = $constraint->constraint;
 
 		$root = $this->context->getRoot();
+
+		if (!isset($root[$otherName]))
+		{
+			$this->setMessage($constraint->message, array('field' => $otherName));
+			return false;
+		}
+
 		$otherValue = $root[$otherName];
 
 		$validatorFactory = new ConstraintValidatorFactory();
